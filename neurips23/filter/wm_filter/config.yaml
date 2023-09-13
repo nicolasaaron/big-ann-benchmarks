@@ -1,7 +1,7 @@
 random-filter-s:
-    faiss:
-      docker-tag: neurips23-filter-faiss
-      module: neurips23.filter.faiss.faiss
+    wm_filter:
+      docker-tag: neurips23-filter-wm_filter
+      module: neurips23.filter.wm_filter.wm_filter
       constructor: FAISS
       base-args: ["@metric"]
       run-groups:
@@ -13,9 +13,9 @@ random-filter-s:
               {"nprobe":2},
               {"nprobe":4}]    
 random-s:
-    faiss:
-      docker-tag: neurips23-filter-faiss
-      module: neurips23.filter.faiss.faiss
+    wm_filter:
+      docker-tag: neurips23-filter-wm_filter
+      module: neurips23.filter.wm_filter.wm_filter
       constructor: FAISS
       base-args: ["@metric"]
       run-groups:
@@ -27,21 +27,21 @@ random-s:
               {"nprobe":2},
               {"nprobe":4}]
 yfcc-10M-unfiltered:
-    faiss:
-      docker-tag: neurips23-filter-faiss
-      module: neurips23.filter.faiss.faiss
+    wm_filter:
+      docker-tag: neurips23-filter-wm_filter
+      module: neurips23.filter.wm_filter.wm_filter
       constructor: FAISS
       base-args: ["@metric"]
       run-groups:
         base:
           args: |
-            [{"indexkey": "IVF16384,SQ8", "binarysig": true, "threads": 16}]
+            [{"indexkey": "IVF1024,PQ96x4fs,Refine(SQ8)", "binarysig": true, "threads": 16}, {"indexkey": "IVF1024,SQ8", "binarysig": true, "threads": 16}]
           query-args: |
             [{"nprobe": 1}, {"nprobe": 4}, {"nprobe": 16}, {"nprobe": 64}]
 yfcc-10M:
-    faiss:
-      docker-tag: neurips23-filter-faiss
-      module: neurips23.filter.faiss.faiss
+    wm_filter:
+      docker-tag: neurips23-filter-wm_filter
+      module: neurips23.filter.wm_filter.wm_filter
       constructor: FAISS
       base-args: ["@metric"]
       run-groups:

@@ -108,8 +108,11 @@ class FAISS(BaseFilterANN):
             self.meta_b = ds.get_dataset_metadata()
             self.meta_b.sort_indices()
 
+
+        print('the size of the index', ds.d)
         index = faiss.index_factory(ds.d, self.indexkey)
         xb = ds.get_dataset()
+
         print("train")
         index.train(xb)
         print("populate")
