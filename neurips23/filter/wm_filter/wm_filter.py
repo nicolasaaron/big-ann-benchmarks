@@ -86,6 +86,7 @@ class FAISS(BaseFilterANN):
         self._index_params = index_params
         self._metric = metric
         print(index_params)
+        self.train_size = index_params.get('train_size', None)
         self.indexkey = index_params.get("indexkey", "IVF32768,SQ8")
         self.binarysig = index_params.get("binarysig", True)
         self.binarysig_proba1 = index_params.get("binarysig_proba1", 0.1)
@@ -94,6 +95,7 @@ class FAISS(BaseFilterANN):
     
 
     def fit(self, dataset):
+        faiss.omp_set_num_threads(self.nt)
         ds = DATASETS[dataset]()
         if ds.search_type() == "knn_filtered" and self.binarysig:
             print("preparing binary signatures")
@@ -114,14 +116,28 @@ class FAISS(BaseFilterANN):
         xb = ds.get_dataset()
 
         print("train")
-        index.train(xb)
+        print('train_size', self.train_size)
+        if self.train_size is not None:
+            x_train = xb[:self.train_size]
+        else:
+            x_train = xb
+        index.train(x_train)
         print("populate")
         if self.binsig is None:
-            index.add(xb)
+            bs = 1024
+            for i0 in range(0, ds.nb, bs):
+                index.add(xb[i0: i0 + bs])
+
         else:
             ids = np.arange(ds.nb) | self.binsig.db_sig
-            index.add_with_ids(xb, ids)
+            print('starting index with ids of type', ids.dtype, ids.shape, xb.shape)
+            bs = 1024
+            for i0 in range(0, ds.nb, bs):
+                index.add_with_ids(xb[i0: i0+bs], ids[i0:i0+bs])
 
+            #index.add_with_ids(xb, ids)
+
+        print('ids added')
         self.index = index
         self.nb = ds.nb
         self.xb = xb
@@ -199,6 +215,10 @@ class FAISS(BaseFilterANN):
         nq = X.shape[0]
         self.I = -np.ones((nq, k), dtype='int32')        
         bs = 1024
+
+        print('k_factor', self.index.k_factor)
+        self.index.k_factor = self.k_factor
+
         for i0 in range(0, nq, bs):
             _, self.I[i0:i0+bs] = self.index.search(X[i0:i0+bs], k)
 
@@ -245,7 +265,7 @@ class FAISS(BaseFilterANN):
                     sel.set_query_words_mask(
                         int(w1), int(w2), self.binsig.query_signature(w1, w2))
 
-                params = faiss.SearchParametersIVF(sel=sel, nprobe=self.nprobe)
+                params = faiss.SearchParametersIVF(sel=sel, nprobe=self.nprobe, k_factor=self.k_factor)
 
                 _, Ii = self.index.search(
                     X[q:q+1], k, params=params
@@ -279,6 +299,10 @@ class FAISS(BaseFilterANN):
             self.qas = query_args
         else:
             self.nprobe = 1
+        if "k_factor" in query_args:
+            self.k_factor = query_args['k_factor']
+            self.qas = query_args
+
         if "mt_threshold" in query_args:
             self.metadata_threshold = query_args['mt_threshold']
         else:
