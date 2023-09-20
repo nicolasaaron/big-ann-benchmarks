@@ -35,7 +35,7 @@ yfcc-10M-unfiltered:
       run-groups:
         base:
           args: |
-            [{"indexkey": "IVF16384,PQ96x4fs,Refine(SQ8)", "binarysig": true, "threads": 8, "train_size": 2000000}]
+            [{"indexkey": "IVF16384,PQ96x4fs,Refine(SQ8)", "threads": 8, "train_size": 2000000}]
           query-args: |
             [{"nprobe": 1, "k_factor":20}, {"nprobe": 4, "k_factor":20}, {"nprobe": 16, "k_factor":20}, {"nprobe": 64, "k_factor":20}]
 yfcc-10M:
@@ -48,23 +48,22 @@ yfcc-10M:
         base:
           args: |
             [{"indexkey": "IVF16384,SQ8", 
-              "binarysig": true, 
               "threads": 8,
               "train_size": 2000000
             }]
           query-args: |
-            [{"nprobe": 1, "mt_threshold":0.0003}, 
-             {"nprobe": 4, "mt_threshold":0.0003}, 
-             {"nprobe": 16, "mt_threshold":0.0003}, 
-             {"nprobe": 32, "mt_threshold":0.0003}, 
-             {"nprobe": 64, "mt_threshold":0.0003}, 
-             {"nprobe": 96, "mt_threshold":0.0003}, 
-             {"nprobe": 1, "mt_threshold":0.0001}, 
-             {"nprobe": 4, "mt_threshold":0.0001}, 
-             {"nprobe": 16, "mt_threshold":0.0001}, 
-             {"nprobe": 32, "mt_threshold":0.0001}, 
-             {"nprobe": 64, "mt_threshold":0.0001}, 
-             {"nprobe": 96, "mt_threshold":0.0001}, 
+            [{"nprobe": 1, "mt_threshold":0.0003},
+             {"nprobe": 4, "mt_threshold":0.0003},
+             {"nprobe": 16, "mt_threshold":0.0003},
+             {"nprobe": 32, "mt_threshold":0.0003},
+             {"nprobe": 64, "mt_threshold":0.0003},
+             {"nprobe": 96, "mt_threshold":0.0003},
+             {"nprobe": 1, "mt_threshold":0.0001},
+             {"nprobe": 4, "mt_threshold":0.0001},
+             {"nprobe": 16, "mt_threshold":0.0001},
+             {"nprobe": 32, "mt_threshold":0.0001},
+             {"nprobe": 64, "mt_threshold":0.0001},
+             {"nprobe": 96, "mt_threshold":0.0001},
              {"nprobe": 1, "mt_threshold":0.01}, 
              {"nprobe": 4, "mt_threshold":0.01}, 
              {"nprobe": 16, "mt_threshold":0.01}, 
@@ -72,4 +71,26 @@ yfcc-10M:
              {"nprobe": 64, "mt_threshold":0.01}, 
              {"nprobe": 96, "mt_threshold":0.01}
             ]
-
+yfcc-10M_2:
+    wm_filter:
+      docker-tag: neurips23-filter-wm_filter
+      module: neurips23.filter.wm_filter.wm_filter
+      constructor: FAISS
+      base-args: ["@metric"]
+      run-groups:
+        base:
+          args: |
+            [{"indexkey": "IVF16384,SQ8", 
+              "threads": 8,
+              "train_size": 2000000
+            }]
+          query-args: |
+            [
+             {"nprobe": 64, "mt_threshold":0.0001},
+                {"nprobe": 1, "mt_threshold":0.001}, 
+             {"nprobe": 4, "mt_threshold":0.001}, 
+             {"nprobe": 16, "mt_threshold":0.001}, 
+             {"nprobe": 32, "mt_threshold":0.001}, 
+             {"nprobe": 64, "mt_threshold":0.001}, 
+             {"nprobe": 96, "mt_threshold":0.001}
+            ]

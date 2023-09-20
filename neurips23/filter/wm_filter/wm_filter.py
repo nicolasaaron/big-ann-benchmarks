@@ -6,7 +6,7 @@ import os
 from multiprocessing.pool import ThreadPool
 
 import faiss
-
+from faiss.contrib.inspect_tools import get_invlist
 from neurips23.filter.base import BaseFilterANN
 from benchmark.datasets import DATASETS
 from benchmark.dataset_io import download_accelerated
@@ -17,68 +17,62 @@ def csr_get_row_indices(m, i):
     """ get the non-0 column indices for row i in matrix m """
     return m.indices[m.indptr[i] : m.indptr[i + 1]]
 
-def make_bow_id_selector(mat, id_mask=0):
+def make_id_selector_ivf_two(docs_per_word):
     sp = faiss.swig_ptr
-    if id_mask == 0:
-        return bow_id_selector.IDSelectorBOW(mat.shape[0], sp(mat.indptr), sp(mat.indices))
-    else:
-        return bow_id_selector.IDSelectorBOWBin(
-            mat.shape[0], sp(mat.indptr), sp(mat.indices), id_mask
-        )
+    return faiss.IDSelectorIVFTwo(sp(docs_per_word.indices), sp(docs_per_word.indptr))
 
-def set_invlist_ids(invlists, l, ids):
-    n, = ids.shape
-    ids = np.ascontiguousarray(ids, dtype='int64')
-    assert invlists.list_size(l) == n
-    faiss.memcpy(
-        invlists.get_ids(l),
-        faiss.swig_ptr(ids), n * 8
-    )
+def make_id_selector_cluster_aware(indices, limits, clusters, cluster_limits):
+    sp = faiss.swig_ptr
+    return faiss.IDSelectorIVFClusterAware(sp(indices), sp(limits), sp(clusters), sp(cluster_limits))
 
+def prepare_filter_by_cluster(docs_per_word, index):
+    print('creating filter cluster')
+    inverted_lists = index.invlists
+    from_id_to_map = dict()
+    for i in range(inverted_lists.nlist):
+        list_ids, _ = get_invlist(inverted_lists, i)
+        for id in list_ids:
+            from_id_to_map[id] = i
+    print('loaded the mapping with {} entries'.format(len(from_id_to_map)))
 
+    ## reorganize the docs per word
+    #
+    cluster_limits = [0]
+    clusters = list()
+    limits = list()
 
-def csr_to_bitcodes(matrix, bitsig):
-    """ Compute binary codes for the rows of the matrix: each binary code is
-    the OR of bitsig for non-0 entries of the row.
-    """
-    indptr = matrix.indptr
-    indices = matrix.indices
-    n = matrix.shape[0]
-    bit_codes = np.zeros(n, dtype='int64')
-    for i in range(n):
-        # print(bitsig[indices[indptr[i]:indptr[i + 1]]])
-        bit_codes[i] = np.bitwise_or.reduce(bitsig[indices[indptr[i]:indptr[i + 1]]])
-    return bit_codes
+    indices = np.array(docs_per_word.indices)
+    indptr = docs_per_word.indptr
+    for word in range(docs_per_word.shape[0]):
+        start = indptr[word]
+        end = indptr[word + 1]
+        if word % 100 == 0:
+            print('processed {} words'.format(word))
+        array_ind_cluster = [(id, from_id_to_map[id]) for id in indices[start:end]]
+        array_ind_cluster.sort(key=lambda x: x[1])
 
+        local_clusters = []
+        local_limits = []
+        current_cluster = -1
+        for pos, arr in enumerate(array_ind_cluster):
+            id, cluster = arr
+            if current_cluster == -1 or cluster != current_cluster:
+                current_cluster = cluster
+                local_clusters.append(cluster)
+                local_limits.append(start + pos)
+            indices[start + pos] = id
 
-class BinarySignatures:
-    """ binary signatures that encode vectors """
+        clusters.extend(local_clusters)
+        limits.extend(local_limits)
+        cluster_limits.append(len(local_clusters))
+    limits.append(len(indices))
 
-    def __init__(self, meta_b, proba_1):
-        nvec, nword = meta_b.shape
-        # number of bits reserved for the vector ids
-        self.id_bits = int(np.ceil(np.log2(nvec)))
-        # number of bits for the binary signature
-        self.sig_bits = nbits = 63 - self.id_bits
+    clusters = np.array(clusters, dtype=np.int16)
+    limits = np.array(limits, dtype=np.int32)
+    cluster_limits = np.array(cluster_limits, dtype=np.int32)
 
-        # select binary signatures for the vocabulary
-        rs = np.random.RandomState(123)    # we rely on this to be reproducible!
-        bitsig = np.packbits(rs.rand(nword, nbits) < proba_1, axis=1)
-        bitsig = np.pad(bitsig, ((0, 0), (0, 8 - bitsig.shape[1]))).view("int64").ravel()
-        self.bitsig = bitsig
+    return indices, limits, clusters, cluster_limits
 
-        # signatures for all the metadata matrix
-        self.db_sig = csr_to_bitcodes(meta_b, bitsig) << self.id_bits
-
-        # mask to keep only the ids
-        self.id_mask = (1 << self.id_bits) - 1
-
-    def query_signature(self, w1, w2):
-        """ compute the query signature for 1 or 2 words """
-        sig = self.bitsig[w1]
-        if w2 != -1:
-            sig |= self.bitsig[w2]
-        return int(sig << self.id_bits)
 
 class FAISS(BaseFilterANN):
 
@@ -88,8 +82,6 @@ class FAISS(BaseFilterANN):
         print(index_params)
         self.train_size = index_params.get('train_size', None)
         self.indexkey = index_params.get("indexkey", "IVF32768,SQ8")
-        self.binarysig = index_params.get("binarysig", True)
-        self.binarysig_proba1 = index_params.get("binarysig_proba1", 0.1)
         self.metadata_threshold = 1e-3
         self.nt = index_params.get("threads", 1)
     
@@ -97,19 +89,6 @@ class FAISS(BaseFilterANN):
     def fit(self, dataset):
         faiss.omp_set_num_threads(self.nt)
         ds = DATASETS[dataset]()
-        if ds.search_type() == "knn_filtered" and self.binarysig:
-            print("preparing binary signatures")
-            meta_b = ds.get_dataset_metadata()
-            self.binsig = BinarySignatures(meta_b, self.binarysig_proba1)
-            print("writing to", self.binarysig_name(dataset))
-            pickle.dump(self.binsig, open(self.binarysig_name(dataset), "wb"), -1)
-        else:
-            self.binsig = None
-
-        if ds.search_type() == "knn_filtered":
-            self.meta_b = ds.get_dataset_metadata()
-            self.meta_b.sort_indices()
-
 
         print('the size of the index', ds.d)
         index = faiss.index_factory(ds.d, self.indexkey)
@@ -123,19 +102,11 @@ class FAISS(BaseFilterANN):
             x_train = xb
         index.train(x_train)
         print("populate")
-        if self.binsig is None:
-            bs = 1024
-            for i0 in range(0, ds.nb, bs):
-                index.add(xb[i0: i0 + bs])
 
-        else:
-            ids = np.arange(ds.nb) | self.binsig.db_sig
-            print('starting index with ids of type', ids.dtype, ids.shape, xb.shape)
-            bs = 1024
-            for i0 in range(0, ds.nb, bs):
-                index.add_with_ids(xb[i0: i0+bs], ids[i0:i0+bs])
+        bs = 1024
+        for i0 in range(0, ds.nb, bs):
+            index.add(xb[i0: i0 + bs])
 
-            #index.add_with_ids(xb, ids)
 
         print('ids added')
         self.index = index
@@ -146,12 +117,29 @@ class FAISS(BaseFilterANN):
         print("store", self.index_name(dataset))
         faiss.write_index(index, self.index_name(dataset))
 
+        if ds.search_type() == "knn_filtered":
+            words_per_doc = ds.get_dataset_metadata()
+            words_per_doc.sort_indices()
+            self.docs_per_word = words_per_doc.T.tocsr()
+            self.docs_per_word.sort_indices()
+            self.ndoc_per_word = self.docs_per_word.indptr[1:] - self.docs_per_word.indptr[:-1]
+            self.freq_per_word = self.ndoc_per_word / self.nb
+            del words_per_doc
+
+            self.indices, self.limits, self.clusters, self.cluster_limits = prepare_filter_by_cluster(self.docs_per_word, self.index)
+            print('dumping cluster map')
+            pickle.dump((self.indices, self.limits, self.clusters, self.cluster_limits), open(self.cluster_sig_name(dataset), "wb"), -1)
+
     
     def index_name(self, name):
-        return f"data/{name}.{self.indexkey}.faissindex"
-    
-    def binarysig_name(self, name):
-        return f"data/{name}.{self.indexkey}.binarysig"
+        return f"data/{name}.{self.indexkey}_wm.faissindex"
+
+
+    def cluster_sig_name(self, name):
+        return f"data/{name}.{self.indexkey}_cluster_wm.pickle"
+
+
+
 
 
     def load_index(self, dataset):
@@ -170,33 +158,34 @@ class FAISS(BaseFilterANN):
             download_accelerated(self._index_params['url'], self.index_name(dataset), quiet=True)
 
         print("Loading index")
+        ds = DATASETS[dataset]()
+        self.nb = ds.nb
+        self.xb = ds.get_dataset()
+
+        if ds.search_type() == "knn_filtered":
+            words_per_doc = ds.get_dataset_metadata()
+            words_per_doc.sort_indices()
+            self.docs_per_word = words_per_doc.T.tocsr()
+            self.docs_per_word.sort_indices()
+            self.ndoc_per_word = self.docs_per_word.indptr[1:] - self.docs_per_word.indptr[:-1]
+            self.freq_per_word = self.ndoc_per_word / self.nb
+            del words_per_doc
 
         self.index = faiss.read_index(self.index_name(dataset))
+
+        if ds.search_type() == "knn_filtered":
+            if  os.path.isfile( self.cluster_sig_name(dataset)):
+                print('loading cluster file')
+                self.indices, self.limits, self.clusters, self.cluster_limits = pickle.load(open(self.cluster_sig_name(dataset), "rb"))
+            else:
+                print('cluster file not found')
+                self.indices, self.limits, self.clusters, self.cluster_limits = prepare_filter_by_cluster(self.docs_per_word, self.index)
+                pickle.dump((self.indices, self.limits, self.clusters, self.cluster_limits), open(self.cluster_sig_name(dataset), "wb"), -1)
 
         self.ps = faiss.ParameterSpace()
         self.ps.initialize(self.index)
 
-        ds = DATASETS[dataset]()
-
-        if ds.search_type() == "knn_filtered" and self.binarysig:
-            if not os.path.exists(self.binarysig_name(dataset)):
-                print("preparing binary signatures")
-                meta_b = ds.get_dataset_metadata()
-                self.binsig = BinarySignatures(meta_b, self.binarysig_proba1)
-            else:
-                print("loading binary signatures")
-                self.binsig = pickle.load(open(self.binarysig_name(dataset), "rb"))
-        else:
-            self.binsig = None
-
-        if ds.search_type() == "knn_filtered":
-            self.meta_b = ds.get_dataset_metadata()
-            self.meta_b.sort_indices()
-
-        self.nb = ds.nb
-        self.xb = ds.get_dataset()
-
-        return True        
+        return True
 
     def index_files_to_store(self, dataset):
         """
@@ -216,9 +205,11 @@ class FAISS(BaseFilterANN):
         self.I = -np.ones((nq, k), dtype='int32')        
         bs = 1024
 
-        print('k_factor', self.index.k_factor)
-        self.index.k_factor = self.k_factor
-
+        try:
+            print('k_factor', self.index.k_factor)
+            self.index.k_factor = self.k_factor
+        except:
+            pass
         for i0 in range(0, nq, bs):
             _, self.I[i0:i0+bs] = self.index.search(X[i0:i0+bs], k)
 
@@ -227,11 +218,11 @@ class FAISS(BaseFilterANN):
         print('running filtered query')
         nq = X.shape[0]
         self.I = -np.ones((nq, k), dtype='int32')
-        meta_b = self.meta_b
+
         meta_q = filter
-        docs_per_word = meta_b.T.tocsr()
-        ndoc_per_word = docs_per_word.indptr[1:] - docs_per_word.indptr[:-1]
-        freq_per_word = ndoc_per_word / self.nb
+        docs_per_word = self.docs_per_word
+        ndoc_per_word = self.ndoc_per_word
+        freq_per_word = self.freq_per_word
         
         def process_one_row(q):
             faiss.omp_set_num_threads(1)
@@ -244,6 +235,7 @@ class FAISS(BaseFilterANN):
                 freq *= freq_per_word[w2]
             else:
                 w2 = -1
+
             if freq < self.metadata_threshold:
                 # metadata first
                 docs = csr_get_row_indices(docs_per_word, w1)
@@ -251,38 +243,33 @@ class FAISS(BaseFilterANN):
                     docs = bow_id_selector.intersect_sorted(
                         docs, csr_get_row_indices(docs_per_word, w2))
 
-                assert len(docs) >= k, pdb.set_trace()
+                assert len(docs) >= k#, pdb.set_trace()
                 xb_subset = self.xb[docs]
                 _, Ii = faiss.knn(X[q : q + 1], xb_subset, k=k)
  
                 self.I[q, :] = docs[Ii.ravel()]
             else:
                 # IVF first, filtered search
-                sel = make_bow_id_selector(meta_b, self.binsig.id_mask if self.binsig else 0)
-                if self.binsig is None:
-                    sel.set_query_words(int(w1), int(w2))
+                #sel = make_id_selector_ivf_two(self.docs_per_word)
+                sel = make_id_selector_cluster_aware(self.indices, self.limits, self.clusters, self.cluster_limits)
+                sel.set_words(int(w1), int(w2))
+
+
+                if hasattr(self, 'k_factor') and self.k_factor > 0:
+                    params = faiss.SearchParametersIVF(sel=sel, nprobe=self.nprobe, k_factor=self.k_factor)
                 else:
-                    sel.set_query_words_mask(
-                        int(w1), int(w2), self.binsig.query_signature(w1, w2))
+                    params = faiss.SearchParametersIVF(sel=sel, nprobe=self.nprobe)
 
-                params = faiss.SearchParametersIVF(sel=sel, nprobe=self.nprobe, k_factor=self.k_factor)
-
-                _, Ii = self.index.search(
-                    X[q:q+1], k, params=params
-                )
+                _, Ii = self.index.search( X[q:q+1], k, params=params )
                 Ii = Ii.ravel()
-                if self.binsig is None:
-                    self.I[q] = Ii
-                else:
-                    # we'll just assume there are enough results
-                    # valid = Ii != -1
-                    # I[q, valid] = Ii[valid] & binsig.id_mask
-                    self.I[q] = Ii & self.binsig.id_mask
+                self.I[q] = Ii
 
 
         if self.nt <= 1:
+        #if True:
             for q in range(nq):
                 process_one_row(q)
+
         else:
             faiss.omp_set_num_threads(self.nt)
             pool = ThreadPool(self.nt)
