@@ -38,7 +38,7 @@ yfcc-10M-unfiltered:
             [{"indexkey": "IVF16384,SQ8", "binarysig": true, "threads": 8}]
           query-args: |
             [{"nprobe": 1}, {"nprobe": 4}, {"nprobe": 16}, {"nprobe": 64}]
-yfcc-10M:
+yfcc-10M-2:
     faiss:
       docker-tag: neurips23-filter-faiss
       module: neurips23.filter.faiss.faiss
@@ -71,4 +71,20 @@ yfcc-10M:
              {"nprobe": 64, "mt_threshold":0.01}, 
              {"nprobe": 96, "mt_threshold":0.01}
             ]
-
+yfcc-10M:
+    faiss:
+      docker-tag: neurips23-filter-faiss
+      module: neurips23.filter.faiss.faiss
+      constructor: FAISS
+      base-args: ["@metric"]
+      run-groups:
+        base:
+          args: |
+            [{"indexkey": "IVF16384,SQ8", 
+              "binarysig": true, 
+              "threads": 8
+            }]
+          query-args: |
+            [
+             {"nprobe": 64, "mt_threshold":0.0003}
+            ]

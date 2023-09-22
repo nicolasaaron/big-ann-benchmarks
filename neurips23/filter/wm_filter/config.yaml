@@ -49,7 +49,8 @@ yfcc-10M:
           args: |
             [{"indexkey": "IVF16384,SQ8", 
               "threads": 8,
-              "train_size": 2000000
+              "train_size": 2000000,
+              "type": "direct"
             }]
           query-args: |
             [{"nprobe": 1, "mt_threshold":0.0003},
@@ -64,14 +65,14 @@ yfcc-10M:
              {"nprobe": 32, "mt_threshold":0.0001},
              {"nprobe": 64, "mt_threshold":0.0001},
              {"nprobe": 96, "mt_threshold":0.0001},
-             {"nprobe": 1, "mt_threshold":0.01}, 
-             {"nprobe": 4, "mt_threshold":0.01}, 
-             {"nprobe": 16, "mt_threshold":0.01}, 
-             {"nprobe": 32, "mt_threshold":0.01}, 
-             {"nprobe": 64, "mt_threshold":0.01}, 
-             {"nprobe": 96, "mt_threshold":0.01}
+             {"nprobe": 1, "mt_threshold":0.001}, 
+             {"nprobe": 4, "mt_threshold":0.001}, 
+             {"nprobe": 16, "mt_threshold":0.001}, 
+             {"nprobe": 32, "mt_threshold":0.001}, 
+             {"nprobe": 64, "mt_threshold":0.001}, 
+             {"nprobe": 96, "mt_threshold":0.001}
             ]
-yfcc-10M_2:
+yfcc-10M-2:
     wm_filter:
       docker-tag: neurips23-filter-wm_filter
       module: neurips23.filter.wm_filter.wm_filter
@@ -82,15 +83,10 @@ yfcc-10M_2:
           args: |
             [{"indexkey": "IVF16384,SQ8", 
               "threads": 8,
-              "train_size": 2000000
+              "train_size": 2000000,
+              "type": "direct"
             }]
           query-args: |
             [
-             {"nprobe": 64, "mt_threshold":0.0001},
-                {"nprobe": 1, "mt_threshold":0.001}, 
-             {"nprobe": 4, "mt_threshold":0.001}, 
-             {"nprobe": 16, "mt_threshold":0.001}, 
-             {"nprobe": 32, "mt_threshold":0.001}, 
-             {"nprobe": 64, "mt_threshold":0.001}, 
-             {"nprobe": 96, "mt_threshold":0.001}
+             {"nprobe": 128, "mt_threshold":0.00001, "max_codes": 2000}
             ]
