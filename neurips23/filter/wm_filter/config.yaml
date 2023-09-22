@@ -38,7 +38,7 @@ yfcc-10M-unfiltered:
             [{"indexkey": "IVF16384,PQ96x4fs,Refine(SQ8)", "threads": 8, "train_size": 2000000}]
           query-args: |
             [{"nprobe": 1, "k_factor":20}, {"nprobe": 4, "k_factor":20}, {"nprobe": 16, "k_factor":20}, {"nprobe": 64, "k_factor":20}]
-yfcc-10M:
+yfcc-10M-2:
     wm_filter:
       docker-tag: neurips23-filter-wm_filter
       module: neurips23.filter.wm_filter.wm_filter
@@ -72,7 +72,7 @@ yfcc-10M:
              {"nprobe": 64, "mt_threshold":0.001}, 
              {"nprobe": 96, "mt_threshold":0.001}
             ]
-yfcc-10M-2:
+yfcc-10M:
     wm_filter:
       docker-tag: neurips23-filter-wm_filter
       module: neurips23.filter.wm_filter.wm_filter
@@ -88,5 +88,24 @@ yfcc-10M-2:
             }]
           query-args: |
             [
-             {"nprobe": 128, "mt_threshold":0.00001, "max_codes": 2000}
+            {"nprobe": 16000, "mt_threshold":0.0, "max_codes": 1000},
+            {"nprobe": 16000, "mt_threshold":0.0, "max_codes": 2000},
+            {"nprobe": 16000, "mt_threshold":0.0, "max_codes": 4000},
+            {"nprobe": 8000, "mt_threshold":0.0, "max_codes": 2000},
+             {"nprobe": 8000, "mt_threshold":0.0, "max_codes": 1000},
+            {"nprobe": 4096, "mt_threshold":0.0, "max_codes": 1000},
+             {"nprobe": 4096, "mt_threshold":0.0, "max_codes": 2000},
+             {"nprobe": 4096, "mt_threshold":0.0, "max_codes": 500},
+             {"nprobe": 2048, "mt_threshold":0.0, "max_codes": 1000},
+             {"nprobe": 256, "mt_threshold":0.0, "max_codes": 500},
+             {"nprobe": 256, "mt_threshold":0.0, "max_codes": 1000},
+                         {"nprobe": 1024, "mt_threshold":0.0, "max_codes": 1000},
+             {"nprobe": 1024, "mt_threshold":0.0, "max_codes": 2000},
+             {"nprobe": 1024, "mt_threshold":0.0, "max_codes": 500},
+                   {"nprobe": 512, "mt_threshold":0.0, "max_codes": 2000},
+             {"nprobe": 512, "mt_threshold":0.0, "max_codes": 1000},
+             {"nprobe": 512, "mt_threshold":0.0, "max_codes": 500},
+              {"nprobe": 256, "mt_threshold":0.0, "max_codes": 2000},
+             {"nprobe": 2048, "mt_threshold":0.0, "max_codes": 2000},
+            {"nprobe": 2048, "mt_threshold":0.0, "max_codes": 500}
             ]
