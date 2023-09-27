@@ -88,12 +88,7 @@ yfcc-10M:
             }]
           query-args: |
             [
-            {"nprobe": 16000, "mt_threshold":0.0, "max_codes": 1000},
-            {"nprobe": 16000, "mt_threshold":0.0, "max_codes": 2000},
-            {"nprobe": 16000, "mt_threshold":0.0, "max_codes": 4000},
-            {"nprobe": 8000, "mt_threshold":0.0, "max_codes": 2000},
-             {"nprobe": 8000, "mt_threshold":0.0, "max_codes": 1000},
-            {"nprobe": 4096, "mt_threshold":0.0, "max_codes": 1000},
+            {"nprobe": 64, "mt_threshold":0.0, "max_codes": 1000},
              {"nprobe": 4096, "mt_threshold":0.0, "max_codes": 2000},
              {"nprobe": 4096, "mt_threshold":0.0, "max_codes": 500},
              {"nprobe": 2048, "mt_threshold":0.0, "max_codes": 1000},

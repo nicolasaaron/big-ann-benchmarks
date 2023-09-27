@@ -6,12 +6,14 @@ import os
 from multiprocessing.pool import ThreadPool
 
 import faiss
+
+
 from faiss.contrib.inspect_tools import get_invlist
 from neurips23.filter.base import BaseFilterANN
 from benchmark.datasets import DATASETS
 from benchmark.dataset_io import download_accelerated
 
-import bow_id_selector
+
 
 def csr_get_row_indices(m, i):
     """ get the non-0 column indices for row i in matrix m """
@@ -33,6 +35,15 @@ def make_id_selector_cluster_aware_direct(id_position_in_cluster, limits, cluste
     sp = faiss.swig_ptr
     return faiss.IDSelectorIVFClusterAwareIntersectDirect(sp(id_position_in_cluster), sp(limits), sp(clusters), sp(cluster_limits))
 
+
+def print_stats():
+    m = 1000000.
+    intersection = faiss.cvar.IDSelectorMy_Stats.intersection/m
+    find_cluster = faiss.cvar.IDSelectorMy_Stats.find_cluster/m
+    set_list_time = faiss.cvar.IDSelectorMy_Stats.set_list_time/m
+    scan_codes =  faiss.cvar.IDSelectorMy_Stats.scan_codes/m
+    inter_plus_find = intersection + find_cluster
+    print('intersection: {}, find_cluster: {}, intersection+ find cluster: {},  set list time: {}, scan_codes: {}'.format(intersection, find_cluster, inter_plus_find, set_list_time, scan_codes))
 
 
 def spot_check_filter(docs_per_word, index, indices, limits, clusters, cluster_limits):
@@ -255,7 +266,8 @@ class FAISS(BaseFilterANN):
 
         max_range = find_max_interval(self.limits)
         print('the max range is {}'.format(max_range))
-
+        del self.xb
+        self.xb = None
         return True
 
     def index_files_to_store(self, dataset):
@@ -287,6 +299,9 @@ class FAISS(BaseFilterANN):
     
     def filtered_query(self, X, filter, k):
         print('running filtered query')
+
+
+
         nq = X.shape[0]
         self.I = -np.ones((nq, k), dtype='int32')
 
@@ -312,8 +327,8 @@ class FAISS(BaseFilterANN):
                 docs = csr_get_row_indices(docs_per_word, w1)
                 if w2 != -1:
                     docs = bow_id_selector.intersect_sorted(
-                        docs, csr_get_row_indices(docs_per_word, w2))
-
+                       docs, csr_get_row_indices(docs_per_word, w2))
+                    pass
                 assert len(docs) >= k#, pdb.set_trace()
                 xb_subset = self.xb[docs]
                 _, Ii = faiss.knn(X[q : q + 1], xb_subset, k=k)
@@ -345,8 +360,9 @@ class FAISS(BaseFilterANN):
                 self.I[q] = Ii
 
 
-        if self.nt <= 1:
-        #if True:
+        #if self.nt <= 1:
+        print_stats()
+        if True:
             for q in range(nq):
                 process_one_row(q)
 
@@ -355,11 +371,14 @@ class FAISS(BaseFilterANN):
             pool = ThreadPool(self.nt)
             list(pool.map(process_one_row, range(nq)))
 
+        print_stats()
+
     def get_results(self):
         return self.I
 
     def set_query_arguments(self, query_args):
         faiss.cvar.indexIVF_stats.reset()
+        faiss.cvar.IDSelectorMy_Stats.reset()
         if "nprobe" in query_args:
             self.nprobe = query_args['nprobe']
             self.ps.set_index_parameters(self.index, f"nprobe={query_args['nprobe']}")

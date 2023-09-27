@@ -10,7 +10,6 @@ FROM neurips23
 
 
 RUN apt-get update; DEBIAN_FRONTEND=noninteractive apt install intel-mkl python3-setuptools  wget python3-matplotlib build-essential checkinstall libssl-dev swig4.0 python3-dev  python3-numpy  python3-numpy-dev   -y
-#RUN conda install -c pytorch faiss-cpu
 COPY install/requirements_conda.txt ./
 # conda doesn't like some of our packages, use pip
 RUN python3 -m pip install -r requirements_conda.txt
@@ -32,11 +31,6 @@ RUN  (cd /faiss/build/faiss/python && python3 setup.py install)
 
 #RUN pip install tritonclient[all]
 ENV PYTHONPATH=/faiss/build/faiss/python/build/lib/
-
-
-COPY neurips23/filter/faiss/bow_id_selector.swig ./
-RUN swig4.0 -c++ -python  -I/faiss/ bow_id_selector.swig
-RUN g++ -shared -O3 -g -fPIC bow_id_selector_wrap.cxx -o _bow_id_selector.so  -I $( python3 -c "import distutils.sysconfig ; print(distutils.sysconfig.get_python_inc())" )    /faiss/build/faiss/libfaiss_avx2.so -I/faiss
 
 RUN python3 -c 'import faiss; print(faiss.IndexFlatL2); print(faiss.__version__)'
 
