@@ -13,7 +13,7 @@ from neurips23.filter.base import BaseFilterANN
 from benchmark.datasets import DATASETS
 from benchmark.dataset_io import download_accelerated
 
-
+import bow_id_selector
 
 def csr_get_row_indices(m, i):
     """ get the non-0 column indices for row i in matrix m """
@@ -27,14 +27,28 @@ def make_id_selector_cluster_aware(indices, limits, clusters, cluster_limits):
     sp = faiss.swig_ptr
     return faiss.IDSelectorIVFClusterAware(sp(indices), sp(limits), sp(clusters), sp(cluster_limits))
 
-def make_id_selector_cluster_aware_intersect(indices, limits, clusters, cluster_limits):
+def make_id_selector_cluster_aware_intersect(indices, limits, clusters, cluster_limits, tmp_size):
     sp = faiss.swig_ptr
-    return faiss.IDSelectorIVFClusterAwareIntersect(sp(indices), sp(limits), sp(clusters), sp(cluster_limits))
+    return faiss.IDSelectorIVFClusterAwareIntersect(sp(indices), sp(limits), sp(clusters), sp(cluster_limits), int(tmp_size))
 
-def make_id_selector_cluster_aware_direct(id_position_in_cluster, limits, clusters,  cluster_limits):
+def make_id_selector_cluster_aware_direct(id_position_in_cluster, limits, clusters,  cluster_limits, tmp_size):
     sp = faiss.swig_ptr
-    return faiss.IDSelectorIVFClusterAwareIntersectDirect(sp(id_position_in_cluster), sp(limits), sp(clusters), sp(cluster_limits))
+    return faiss.IDSelectorIVFClusterAwareIntersectDirect(sp(id_position_in_cluster), sp(limits), sp(clusters), sp(cluster_limits), int(tmp_size))
 
+def make_id_selector_cluster_aware_direct_exp(id_position_in_cluster, limits, nprobes, tmp_size):
+    sp = faiss.swig_ptr
+    return faiss.IDSelectorIVFClusterAwareIntersectDirectExp(sp(id_position_in_cluster), sp(limits), int(nprobes), int(tmp_size))
+
+
+def find_invlists(index):
+    try:
+        inverted_lists = index.invlists
+    except:
+        base_index = faiss.downcast_index(index.base_index)
+        print('cannot find the inverted list trying one level down')
+        print('type of index', type(base_index))
+        inverted_lists = base_index.invlists
+    return inverted_lists
 
 def print_stats():
     m = 1000000.
@@ -48,7 +62,10 @@ def print_stats():
 
 def spot_check_filter(docs_per_word, index, indices, limits, clusters, cluster_limits):
     print('running spot check')
-    inverted_lists = index.invlists
+
+
+    inverted_lists = find_invlists(index)
+
     from_id_to_map = dict()
     for i in range(inverted_lists.nlist):
         list_ids, _ = get_invlist(inverted_lists, i)
@@ -82,6 +99,52 @@ def spot_check_filter(docs_per_word, index, indices, limits, clusters, cluster_l
                 ids_in_word.remove(id)
         assert len(ids_in_word) == 0  # we should have covered all the ids in the word with the clusters
 
+
+def spot_check_filter_exp(docs_per_word, index, indices, limits):
+    print('running spot check')
+
+
+    inverted_lists = find_invlists(index)
+
+    from_id_to_map = dict()
+    for i in range(inverted_lists.nlist):
+        list_ids, _ = get_invlist(inverted_lists, i)
+        for id in list_ids:
+            from_id_to_map[id] = i
+
+    indptr = docs_per_word.indptr
+
+    nprobes = inverted_lists.nlist
+
+    ## lets' run some spot check
+    for word in [0, 5000, 12124, 151123, 198000]:
+    #for word in range(docs_per_word.shape[0]):
+    #for word in [docs_per_word.shape[0]-1 ]:
+        local_ids_to_cluster = dict()
+        #print(limits[nprobes * word: nprobes * word + nprobes])
+        for cluster in range(nprobes):
+            c_start = limits[word * nprobes + cluster]
+            c_end = limits[word * nprobes + cluster+1]
+
+            if c_end >=0 and c_start >=0  and c_end > c_start:
+                for id in indices[c_start: c_end]:
+                    local_ids_to_cluster[id] = cluster
+
+
+
+        start = indptr[word]
+        end = indptr[word + 1]
+        ids_in_word = {id for id in docs_per_word.indices[start:end]}
+        print(len(ids_in_word), len(local_ids_to_cluster))
+        assert len(ids_in_word) == len(local_ids_to_cluster)
+        for id in ids_in_word:
+            cluster_found = from_id_to_map[id]
+            assert cluster_found == local_ids_to_cluster[id]
+        print('done checking word ', word)
+
+    print('done spot check')
+
+
 def find_max_interval(limits):
 
     out = -1
@@ -94,12 +157,13 @@ def find_max_interval(limits):
 
 def prepare_filter_by_cluster(docs_per_word, index):
     print('creating filter cluster')
-    inverted_lists = index.invlists
+    inverted_lists = find_invlists(index)
     from_id_to_map = dict()
     from_id_to_pos = dict()
     for i in range(inverted_lists.nlist):
         list_ids, _ = get_invlist(inverted_lists, i)
         for pos, id in enumerate(list_ids):
+            #print('list: ', i, "id: ", id, "pos: ",pos)
             from_id_to_map[id] = i
             from_id_to_pos[id] = pos
     print('loaded the mapping with {} entries'.format(len(from_id_to_map)))
@@ -147,6 +211,68 @@ def prepare_filter_by_cluster(docs_per_word, index):
     id_position_in_cluster = np.array(id_position_in_cluster, dtype=np.int32)
 
     return indices, limits, clusters, cluster_limits, id_position_in_cluster
+
+
+def prepare_filter_by_cluster_exp(docs_per_word, index):
+    print('creating filter cluster expanded')
+    inverted_lists = find_invlists(index)
+    from_id_to_map = dict()
+    from_id_to_pos = dict()
+
+    nprobes = inverted_lists.nlist
+    for i in range(inverted_lists.nlist):
+        list_ids, _ = get_invlist(inverted_lists, i)
+        for pos, id in enumerate(list_ids):
+            #print('list: ', i, "id: ", id, "pos: ",pos)
+            from_id_to_map[id] = i
+            from_id_to_pos[id] = pos
+    print('loaded the mapping with {} entries'.format(len(from_id_to_map)))
+
+    ## reorganize the docs per word
+    #
+
+    limits = -np.ones( (docs_per_word.shape[0] * nprobes + 1,), dtype=np.int32)
+    id_position_in_cluster = list()
+
+    indices = np.array(docs_per_word.indices)
+    indptr = docs_per_word.indptr
+    for word in range(docs_per_word.shape[0]):
+        start = indptr[word]
+        end = indptr[word + 1]
+        if word % 100 == 0:
+            print('processed {} words'.format(word))
+        array_ind_cluster = [(id, from_id_to_map[id]) for id in indices[start:end]]
+        array_ind_cluster.sort(key=lambda x: x[1])
+
+
+
+        local_limits = []
+        current_cluster = -1
+
+        for pos, arr in enumerate(array_ind_cluster):
+            id, cluster = arr
+            if current_cluster == -1 or cluster != current_cluster:
+
+                if current_cluster != -1:
+                    limits[word * nprobes + current_cluster + 1] = start + pos
+
+
+                current_cluster = cluster
+                local_limits.append(start + pos)
+
+                limits[word * nprobes + current_cluster] = start + pos
+
+            indices[start + pos] = id
+            id_position_in_cluster.append(from_id_to_pos[id])
+
+        limits[word * nprobes + current_cluster + 1] = start + len(array_ind_cluster)
+
+
+    limits = np.array(limits, dtype=np.int32)
+
+    id_position_in_cluster = np.array(id_position_in_cluster, dtype=np.int32)
+
+    return indices, limits, id_position_in_cluster, nprobes
 
 
 class FAISS(BaseFilterANN):
@@ -202,17 +328,34 @@ class FAISS(BaseFilterANN):
             self.freq_per_word = self.ndoc_per_word / self.nb
             del words_per_doc
 
-            self.indices, self.limits, self.clusters, self.cluster_limits, self.id_position_in_cluster = prepare_filter_by_cluster(self.docs_per_word, self.index)
-            print('dumping cluster map')
-            pickle.dump((self.indices, self.limits, self.clusters, self.cluster_limits, self.id_position_in_cluster), open(self.cluster_sig_name(dataset), "wb"), -1)
-            spot_check_filter(self.docs_per_word, self.index, self.indices, self.limits, self.clusters,
-                              self.cluster_limits)
+            if self.type == 'exp':
+                self.indices, self.limits, self.id_position_in_cluster, self.total_clusters = prepare_filter_by_cluster_exp(
+                    self.docs_per_word, self.index)
+                pickle.dump(
+                    (self.indices, self.limits, self.id_position_in_cluster, self.total_clusters ),
+                    open(self.cluster_sig_name(dataset), "wb"), -1)
+                spot_check_filter_exp(self.docs_per_word, self.index, self.indices, self.limits)
+            else:
+                self.indices, self.limits, self.clusters, self.cluster_limits, self.id_position_in_cluster = prepare_filter_by_cluster(self.docs_per_word, self.index)
+                print('dumping cluster map')
+                pickle.dump((self.indices, self.limits, self.clusters, self.cluster_limits, self.id_position_in_cluster), open(self.cluster_sig_name(dataset), "wb"), -1)
+                spot_check_filter(self.docs_per_word, self.index, self.indices, self.limits, self.clusters,
+                                  self.cluster_limits)
+
+            self.max_range = find_max_interval(self.limits)
+            print('the max range is {}'.format(self.max_range))
     
     def index_name(self, name):
-        return f"data/{name}.{self.indexkey}_wm.faissindex"
+
+        if self.type == 'exp':
+            return f"data/{name}.{self.indexkey}_exp_wm.faissindex"
+        else:
+            return f"data/{name}.{self.indexkey}_wm.faissindex"
 
 
     def cluster_sig_name(self, name):
+        if self.type == 'exp':
+            return f"data/{name}.{self.indexkey}_exp_cluster_wm.pickle"
         return f"data/{name}.{self.indexkey}_cluster_wm.pickle"
 
 
@@ -253,21 +396,38 @@ class FAISS(BaseFilterANN):
         if ds.search_type() == "knn_filtered":
             if  os.path.isfile( self.cluster_sig_name(dataset)):
                 print('loading cluster file')
-                self.indices, self.limits, self.clusters, self.cluster_limits, self.id_position_in_cluster = pickle.load(open(self.cluster_sig_name(dataset), "rb"))
+                if self.type == 'exp':
+                    self.indices, self.limits, self.id_position_in_cluster, self.total_clusters  = pickle.load(
+                        open(self.cluster_sig_name(dataset), "rb"))
+                    spot_check_filter_exp(self.docs_per_word, self.index, self.indices, self.limits)
+
+                else:
+                    self.indices, self.limits, self.clusters, self.cluster_limits, self.id_position_in_cluster = pickle.load(open(self.cluster_sig_name(dataset), "rb"))
             else:
                 print('cluster file not found')
-                self.indices, self.limits, self.clusters, self.cluster_limits, self.id_position_in_cluster = prepare_filter_by_cluster(self.docs_per_word, self.index)
-                pickle.dump((self.indices, self.limits, self.clusters, self.cluster_limits, self.id_position_in_cluster), open(self.cluster_sig_name(dataset), "wb"), -1)
+                if self.type == 'exp':
+                    self.indices, self.limits,  self.id_position_in_cluster, self.total_clusters  = prepare_filter_by_cluster_exp(
+                        self.docs_per_word, self.index)
+                    pickle.dump(
+                        (self.indices, self.limits, self.id_position_in_cluster, self.total_clusters ),
+                        open(self.cluster_sig_name(dataset), "wb"), -1)
+                    spot_check_filter_exp(self.docs_per_word, self.index, self.indices, self.limits)
 
-            spot_check_filter(self.docs_per_word, self.index, self.indices, self.limits, self.clusters, self.cluster_limits)
+                else:
+                    self.indices, self.limits, self.clusters, self.cluster_limits, self.id_position_in_cluster = prepare_filter_by_cluster(self.docs_per_word, self.index)
+                    pickle.dump((self.indices, self.limits, self.clusters, self.cluster_limits, self.id_position_in_cluster), open(self.cluster_sig_name(dataset), "wb"), -1)
+
+                    spot_check_filter(self.docs_per_word, self.index, self.indices, self.limits, self.clusters, self.cluster_limits)
+
+            self.max_range = find_max_interval(self.limits)
+            print('the max range is {}'.format(self.max_range))
 
         self.ps = faiss.ParameterSpace()
         self.ps.initialize(self.index)
 
-        max_range = find_max_interval(self.limits)
-        print('the max range is {}'.format(max_range))
-        del self.xb
-        self.xb = None
+
+        #del self.xb
+        #self.xb = None
         return True
 
     def index_files_to_store(self, dataset):
@@ -291,7 +451,8 @@ class FAISS(BaseFilterANN):
         try:
             print('k_factor', self.index.k_factor)
             self.index.k_factor = self.k_factor
-        except:
+        except Exception as e:
+            print(e)
             pass
         for i0 in range(0, nq, bs):
             _, self.I[i0:i0+bs] = self.index.search(X[i0:i0+bs], k)
@@ -299,6 +460,14 @@ class FAISS(BaseFilterANN):
     
     def filtered_query(self, X, filter, k):
         print('running filtered query')
+
+        try:
+            print('k_factor was', self.index.k_factor)
+            self.index.k_factor = self.k_factor
+            print('setting k_factor to ', self.k_factor)
+        except Exception as e:
+            print(e)
+            pass
 
 
 
@@ -341,28 +510,27 @@ class FAISS(BaseFilterANN):
                 elif self.type == "aware":
                     sel = make_id_selector_cluster_aware(self.indices, self.limits, self.clusters, self.cluster_limits)
                 elif self.type == 'intersect':
-                    sel = make_id_selector_cluster_aware_intersect(self.indices, self.limits, self.clusters, self.cluster_limits)
+                    sel = make_id_selector_cluster_aware_intersect(self.indices, self.limits, self.clusters, self.cluster_limits, self.max_range)
                 elif self.type == 'direct':
                     sel = make_id_selector_cluster_aware_direct(self.id_position_in_cluster, self.limits, self.clusters,
-                                                                   self.cluster_limits)
+                                                                   self.cluster_limits, self.max_range)
+                elif self.type == 'exp':
+                    sel = make_id_selector_cluster_aware_direct_exp(self.id_position_in_cluster, self.limits, self.total_clusters, self.max_range)
                 else:
                     raise Exception('unknown type ', self.type)
                 sel.set_words(int(w1), int(w2))
 
 
-                if hasattr(self, 'k_factor') and self.k_factor > 0:
-                    params = faiss.SearchParametersIVF(sel=sel, nprobe=self.nprobe, k_factor=self.k_factor, max_codes=self.max_codes)
-                else:
-                    params = faiss.SearchParametersIVF(sel=sel, nprobe=self.nprobe, max_codes=self.max_codes)
+                params = faiss.SearchParametersIVF(sel=sel, nprobe=self.nprobe, max_codes=self.max_codes)
 
                 _, Ii = self.index.search( X[q:q+1], k, params=params )
                 Ii = Ii.ravel()
                 self.I[q] = Ii
 
 
-        #if self.nt <= 1:
-        print_stats()
-        if True:
+        if self.nt <= 1:
+        #print_stats()
+        #if True:
             for q in range(nq):
                 process_one_row(q)
 
@@ -371,14 +539,14 @@ class FAISS(BaseFilterANN):
             pool = ThreadPool(self.nt)
             list(pool.map(process_one_row, range(nq)))
 
-        print_stats()
+        #print_stats()
 
     def get_results(self):
         return self.I
 
     def set_query_arguments(self, query_args):
-        faiss.cvar.indexIVF_stats.reset()
-        faiss.cvar.IDSelectorMy_Stats.reset()
+        #faiss.cvar.indexIVF_stats.reset()
+        #faiss.cvar.IDSelectorMy_Stats.reset()
         if "nprobe" in query_args:
             self.nprobe = query_args['nprobe']
             self.ps.set_index_parameters(self.index, f"nprobe={query_args['nprobe']}")

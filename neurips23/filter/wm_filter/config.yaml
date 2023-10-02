@@ -35,7 +35,7 @@ yfcc-10M-unfiltered:
       run-groups:
         base:
           args: |
-            [{"indexkey": "IVF16384,PQ96x4fs,Refine(SQ8)", "threads": 8, "train_size": 2000000}]
+            [{"indexkey": "IVF512,PQ96x4fs,Refine(SQ8)", "threads": 8, "train_size": 2000000}]
           query-args: |
             [{"nprobe": 1, "k_factor":20}, {"nprobe": 4, "k_factor":20}, {"nprobe": 16, "k_factor":20}, {"nprobe": 64, "k_factor":20}]
 yfcc-10M-2:
@@ -84,7 +84,7 @@ yfcc-10M:
             [{"indexkey": "IVF16384,SQ8", 
               "threads": 8,
               "train_size": 2000000,
-              "type": "direct"
+              "type": "intersect"
             }]
           query-args: |
             [
@@ -103,4 +103,134 @@ yfcc-10M:
               {"nprobe": 256, "mt_threshold":0.0, "max_codes": 2000},
              {"nprobe": 2048, "mt_threshold":0.0, "max_codes": 2000},
             {"nprobe": 2048, "mt_threshold":0.0, "max_codes": 500}
+            ]
+    wm_filter_fs:
+      docker-tag: neurips23-filter-wm_filter
+      module: neurips23.filter.wm_filter.wm_filter
+      constructor: FAISS
+      base-args: ["@metric"]
+      run-groups:
+        base:
+          args: |
+            [{"indexkey": "IVF16384,PQ96x4fs,Refine(SQ8)", 
+              "threads": 8,
+              "train_size": 2000000,
+              "type": "aware"
+            }]
+          query-args: |
+            [
+            {"nprobe": 64, "mt_threshold":0.0002, "max_codes": 1000, "k_factor":20},
+            {"nprobe": 64, "mt_threshold":0.0001, "max_codes": 1000, "k_factor":20},
+            {"nprobe": 64, "mt_threshold":0.0003, "max_codes": 1000, "k_factor":20},
+             {"nprobe": 32, "mt_threshold":0.0002, "max_codes": 1000, "k_factor":20},
+            {"nprobe": 32, "mt_threshold":0.0001, "max_codes": 1000, "k_factor":20},
+            {"nprobe": 32, "mt_threshold":0.0003, "max_codes": 1000, "k_factor":20},
+              {"nprobe": 128, "mt_threshold":0.0002, "max_codes": 1000, "k_factor":20},
+            {"nprobe": 128, "mt_threshold":0.0001, "max_codes": 1000, "k_factor":20},
+            {"nprobe": 128, "mt_threshold":0.0003, "max_codes": 1000, "k_factor":20}
+            ]
+    wm_filter_fs_intersect:
+      docker-tag: neurips23-filter-wm_filter
+      module: neurips23.filter.wm_filter.wm_filter
+      constructor: FAISS
+      base-args: [ "@metric" ]
+      run-groups:
+        base:
+          args: |
+            [{"indexkey": "IVF16384,PQ96x4fs,Refine(SQ8)", 
+              "threads": 8,
+              "train_size": 2000000,
+              "type": "intersect"
+            }]
+          query-args: |
+            [
+            {"nprobe": 64, "mt_threshold":0.0002, "max_codes": 1000, "k_factor":20},
+            {"nprobe": 64, "mt_threshold":0.0001, "max_codes": 1000, "k_factor":20},
+            {"nprobe": 64, "mt_threshold":0.0003, "max_codes": 1000, "k_factor":20},
+             {"nprobe": 32, "mt_threshold":0.0002, "max_codes": 1000, "k_factor":20},
+            {"nprobe": 32, "mt_threshold":0.0001, "max_codes": 1000, "k_factor":20},
+            {"nprobe": 32, "mt_threshold":0.0003, "max_codes": 1000, "k_factor":20},
+              {"nprobe": 128, "mt_threshold":0.0002, "max_codes": 1000, "k_factor":20},
+            {"nprobe": 128, "mt_threshold":0.0001, "max_codes": 1000, "k_factor":20},
+            {"nprobe": 128, "mt_threshold":0.0003, "max_codes": 1000, "k_factor":20}
+            ]
+    wm_filter_exp:
+      docker-tag: neurips23-filter-wm_filter
+      module: neurips23.filter.wm_filter.wm_filter
+      constructor: FAISS
+      base-args: [ "@metric" ]
+      run-groups:
+        base:
+          args: |
+            [{"indexkey": "IVF512,SQ8", 
+              "threads": 8,
+              "train_size": 2000000,
+              "type": "exp"
+            }]
+          query-args: |
+            [
+              {"nprobe": 4, "mt_threshold":0.0, "max_codes": 2000},
+             {"nprobe": 4, "mt_threshold":0.0001, "max_codes": 2000},
+             {"nprobe": 8, "mt_threshold":0.0, "max_codes": 2000},
+             {"nprobe": 8, "mt_threshold":0.0001, "max_codes": 2000},
+            {"nprobe": 16, "mt_threshold":0.0, "max_codes": 2000},
+             {"nprobe": 16, "mt_threshold":0.0001, "max_codes": 2000},
+             {"nprobe": 4, "mt_threshold":0.0, "max_codes": 2000},
+             {"nprobe": 4, "mt_threshold":0.0001, "max_codes": 2000},
+             {"nprobe": 8, "mt_threshold":0.0, "max_codes": 2000},
+             {"nprobe": 8, "mt_threshold":0.0001, "max_codes": 2000},
+            {"nprobe": 16, "mt_threshold":0.0, "max_codes": 2000},
+             {"nprobe": 16, "mt_threshold":0.0001, "max_codes": 2000},
+            {"nprobe": 4, "mt_threshold":0.0, "max_codes": 1000},
+             {"nprobe": 4, "mt_threshold":0.0001, "max_codes": 1000},
+             {"nprobe": 8, "mt_threshold":0.0, "max_codes": 1000},
+             {"nprobe": 8, "mt_threshold":0.0001, "max_codes": 1000},
+            {"nprobe": 16, "mt_threshold":0.0, "max_codes": 1000},
+             {"nprobe": 16, "mt_threshold":0.0001, "max_codes": 1000}
+            ]
+    wm_filter_exp_16k:
+      docker-tag: neurips23-filter-wm_filter
+      module: neurips23.filter.wm_filter.wm_filter
+      constructor: FAISS
+      base-args: [ "@metric" ]
+      run-groups:
+        base:
+          args: |
+            [{"indexkey": "IVF16384,SQ8", 
+              "threads": 8,
+              "train_size": 2000000,
+              "type": "exp"
+            }]
+          query-args: |
+            [
+            {"nprobe": 64, "mt_threshold":0.0, "max_codes": 1000},
+             {"nprobe": 4096, "mt_threshold":0.0, "max_codes": 2000},
+             {"nprobe": 4096, "mt_threshold":0.0, "max_codes": 500},
+             {"nprobe": 2048, "mt_threshold":0.0, "max_codes": 1000},
+             {"nprobe": 256, "mt_threshold":0.0, "max_codes": 500},
+             {"nprobe": 256, "mt_threshold":0.0, "max_codes": 1000},
+                         {"nprobe": 1024, "mt_threshold":0.0, "max_codes": 1000},
+             {"nprobe": 1024, "mt_threshold":0.0, "max_codes": 2000},
+             {"nprobe": 1024, "mt_threshold":0.0, "max_codes": 500},
+                   {"nprobe": 512, "mt_threshold":0.0, "max_codes": 2000},
+             {"nprobe": 512, "mt_threshold":0.0, "max_codes": 1000},
+             {"nprobe": 512, "mt_threshold":0.0, "max_codes": 500},
+              {"nprobe": 256, "mt_threshold":0.0, "max_codes": 2000},
+             {"nprobe": 2048, "mt_threshold":0.0, "max_codes": 2000},
+            {"nprobe": 2048, "mt_threshold":0.0, "max_codes": 500},
+             {"nprobe": 64, "mt_threshold":0.0001, "max_codes": 1000},
+             {"nprobe": 4096, "mt_threshold":0.0001, "max_codes": 2000},
+             {"nprobe": 4096, "mt_threshold":0.0001, "max_codes": 500},
+             {"nprobe": 2048, "mt_threshold":0.0001, "max_codes": 1000},
+             {"nprobe": 256, "mt_threshold":0.0001, "max_codes": 500},
+             {"nprobe": 256, "mt_threshold":0.0001, "max_codes": 1000},
+              {"nprobe": 1024, "mt_threshold":0.0001, "max_codes": 1000},
+             {"nprobe": 1024, "mt_threshold":0.0001, "max_codes": 2000},
+             {"nprobe": 1024, "mt_threshold":0.0001, "max_codes": 500},
+              {"nprobe": 512, "mt_threshold":0.0001, "max_codes": 2000},
+             {"nprobe": 512, "mt_threshold":0.0001, "max_codes": 1000},
+             {"nprobe": 512, "mt_threshold":0.0001, "max_codes": 500},
+              {"nprobe": 256, "mt_threshold":0.0001, "max_codes": 2000},
+             {"nprobe": 2048, "mt_threshold":0.0001, "max_codes": 2000},
+            {"nprobe": 2048, "mt_threshold":0.0001, "max_codes": 500}
             ]
