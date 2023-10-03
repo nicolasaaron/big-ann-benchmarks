@@ -4,6 +4,7 @@ import numpy as np
 import os
 
 from multiprocessing.pool import ThreadPool
+from threading import current_thread
 
 import faiss
 
@@ -180,7 +181,7 @@ def prepare_filter_by_cluster(docs_per_word, index):
     for word in range(docs_per_word.shape[0]):
         start = indptr[word]
         end = indptr[word + 1]
-        if word % 100 == 0:
+        if word % 10000 == 0:
             print('processed {} words'.format(word))
         array_ind_cluster = [(id, from_id_to_map[id]) for id in indices[start:end]]
         array_ind_cluster.sort(key=lambda x: x[1])
@@ -239,7 +240,7 @@ def prepare_filter_by_cluster_exp(docs_per_word, index):
     for word in range(docs_per_word.shape[0]):
         start = indptr[word]
         end = indptr[word + 1]
-        if word % 100 == 0:
+        if word % 10000 == 0:
             print('processed {} words'.format(word))
         array_ind_cluster = [(id, from_id_to_map[id]) for id in indices[start:end]]
         array_ind_cluster.sort(key=lambda x: x[1])
@@ -426,8 +427,13 @@ class FAISS(BaseFilterANN):
         self.ps.initialize(self.index)
 
 
-        #del self.xb
-        #self.xb = None
+        # delete not necessary data
+        del self.xb
+        del ds
+        if self.type == "exp" or self.type == 'direct':
+            print(" deleting indices")
+            del self.indices
+        #del self.docs_per_word
         return True
 
     def index_files_to_store(self, dataset):
@@ -478,9 +484,15 @@ class FAISS(BaseFilterANN):
         docs_per_word = self.docs_per_word
         ndoc_per_word = self.ndoc_per_word
         freq_per_word = self.freq_per_word
+
+
+        selector_by_thread = dict()
+
         
         def process_one_row(q):
             faiss.omp_set_num_threads(1)
+            thread = current_thread()
+
             qwords = csr_get_row_indices(meta_q, q)
             assert qwords.size in (1, 2)
             w1 = qwords[0]
@@ -504,26 +516,31 @@ class FAISS(BaseFilterANN):
  
                 self.I[q, :] = docs[Ii.ravel()]
             else:
-                # IVF first, filtered search
-                if self.type == 'simple':
-                    sel = make_id_selector_ivf_two(self.docs_per_word)
-                elif self.type == "aware":
-                    sel = make_id_selector_cluster_aware(self.indices, self.limits, self.clusters, self.cluster_limits)
-                elif self.type == 'intersect':
-                    sel = make_id_selector_cluster_aware_intersect(self.indices, self.limits, self.clusters, self.cluster_limits, self.max_range)
-                elif self.type == 'direct':
-                    sel = make_id_selector_cluster_aware_direct(self.id_position_in_cluster, self.limits, self.clusters,
-                                                                   self.cluster_limits, self.max_range)
-                elif self.type == 'exp':
-                    sel = make_id_selector_cluster_aware_direct_exp(self.id_position_in_cluster, self.limits, self.total_clusters, self.max_range)
+
+                if thread not in selector_by_thread:
+                    print('generating selector')
+                    # IVF first, filtered search
+                    if self.type == 'simple':
+                        sel = make_id_selector_ivf_two(self.docs_per_word)
+                    elif self.type == "aware":
+                        sel = make_id_selector_cluster_aware(self.indices, self.limits, self.clusters, self.cluster_limits)
+                    elif self.type == 'intersect':
+                        sel = make_id_selector_cluster_aware_intersect(self.indices, self.limits, self.clusters, self.cluster_limits, self.max_range)
+                    elif self.type == 'direct':
+                        sel = make_id_selector_cluster_aware_direct(self.id_position_in_cluster, self.limits, self.clusters,
+                                                                       self.cluster_limits, self.max_range)
+                    elif self.type == 'exp':
+                        sel = make_id_selector_cluster_aware_direct_exp(self.id_position_in_cluster, self.limits, self.total_clusters, self.max_range)
+                    else:
+                        raise Exception('unknown type ', self.type)
+                    selector_by_thread[thread] = sel
                 else:
-                    raise Exception('unknown type ', self.type)
+                    sel = selector_by_thread.get(thread)
+
                 sel.set_words(int(w1), int(w2))
-
-
                 params = faiss.SearchParametersIVF(sel=sel, nprobe=self.nprobe, max_codes=self.max_codes)
 
-                _, Ii = self.index.search( X[q:q+1], k, params=params )
+                _, Ii = self.index.search( X[q:q+1], k, params=params)
                 Ii = Ii.ravel()
                 self.I[q] = Ii
 
@@ -536,6 +553,7 @@ class FAISS(BaseFilterANN):
 
         else:
             faiss.omp_set_num_threads(self.nt)
+
             pool = ThreadPool(self.nt)
             list(pool.map(process_one_row, range(nq)))
 
