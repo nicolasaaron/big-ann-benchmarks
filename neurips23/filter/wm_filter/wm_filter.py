@@ -57,8 +57,10 @@ def print_stats():
     find_cluster = faiss.cvar.IDSelectorMy_Stats.find_cluster/m
     set_list_time = faiss.cvar.IDSelectorMy_Stats.set_list_time/m
     scan_codes =  faiss.cvar.IDSelectorMy_Stats.scan_codes/m
+    one_list = faiss.cvar.IDSelectorMy_Stats.one_list/m
+    extra = faiss.cvar.IDSelectorMy_Stats.extra / m
     inter_plus_find = intersection + find_cluster
-    print('intersection: {}, find_cluster: {}, intersection+ find cluster: {},  set list time: {}, scan_codes: {}'.format(intersection, find_cluster, inter_plus_find, set_list_time, scan_codes))
+    print('intersection: {}, find_cluster: {}, intersection+ find cluster: {},  set list time: {}, scan_codes: {}, one list: {}, extra: {}'.format(intersection, find_cluster, inter_plus_find, set_list_time, scan_codes, one_list, extra))
 
 
 def spot_check_filter(docs_per_word, index, indices, limits, clusters, cluster_limits):
@@ -428,8 +430,8 @@ class FAISS(BaseFilterANN):
 
 
         # delete not necessary data
-        del self.xb
-        del ds
+        #del self.xb
+        #del ds
         if self.type == "exp" or self.type == 'direct':
             print(" deleting indices")
             del self.indices
@@ -518,7 +520,7 @@ class FAISS(BaseFilterANN):
             else:
 
                 if thread not in selector_by_thread:
-                    print('generating selector')
+
                     # IVF first, filtered search
                     if self.type == 'simple':
                         sel = make_id_selector_ivf_two(self.docs_per_word)
@@ -546,12 +548,14 @@ class FAISS(BaseFilterANN):
 
 
         if self.nt <= 1:
-        #print_stats()
+            #print_stats()
         #if True:
             for q in range(nq):
                 process_one_row(q)
+                #print_stats()
 
         else:
+            print('threading')
             faiss.omp_set_num_threads(self.nt)
 
             pool = ThreadPool(self.nt)
