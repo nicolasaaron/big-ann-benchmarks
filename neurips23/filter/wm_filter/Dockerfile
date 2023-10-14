@@ -22,6 +22,7 @@ RUN cd /build/CMake-3.27.1 &&   ./bootstrap && make   && make install
 
 
 # we get the modified Faiss code
+RUN git clone https://github.com/alemagnani/faiss.git
 RUN cd / &&  git clone https://github.com/alemagnani/faiss.git && cd /faiss && git pull && git checkout wm_filter
 
 RUN apt install -y cmake
@@ -32,11 +33,6 @@ RUN  (cd /faiss/build/faiss/python && python3 setup.py install)
 
 #RUN pip install tritonclient[all]
 ENV PYTHONPATH=/faiss/build/faiss/python/build/lib/
-
-
-COPY neurips23/filter/faiss/bow_id_selector.swig ./
-RUN /usr/bin/swig4.0 -c++ -python  -I/faiss/ bow_id_selector.swig
-RUN g++ -shared -O3 -g -fPIC bow_id_selector_wrap.cxx -o _bow_id_selector.so  -I $( python3 -c "import distutils.sysconfig ; print(distutils.sysconfig.get_python_inc())" )    /faiss/build/faiss/libfaiss_avx2.so -I/faiss
 
 RUN python3 -c 'import faiss; print(faiss.IndexFlatL2); print(faiss.__version__)'
 

@@ -13,8 +13,8 @@ from faiss.contrib.inspect_tools import get_invlist
 from neurips23.filter.base import BaseFilterANN
 from benchmark.datasets import DATASETS
 from benchmark.dataset_io import download_accelerated
+from math import log10, pow
 
-import bow_id_selector
 
 def csr_get_row_indices(m, i):
     """ get the non-0 column indices for row i in matrix m """
@@ -189,7 +189,7 @@ def prepare_filter_by_cluster(docs_per_word, index):
         array_ind_cluster.sort(key=lambda x: x[1])
 
         if len(array_ind_cluster) == 0:
-            print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!there is am empty word!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+            pass
         local_clusters = []
         local_limits = []
         current_cluster = -1
@@ -283,13 +283,13 @@ class FAISS(BaseFilterANN):
     def __init__(self,  metric, index_params):
         self._index_params = index_params
         self._metric = metric
-        print(index_params)
+
         self.train_size = index_params.get('train_size', None)
         self.indexkey = index_params.get("indexkey", "IVF32768,SQ8")
         self.metadata_threshold = 1e-3
         self.nt = index_params.get("threads", 1)
         self.type = index_params.get("type", "intersect")
-    
+
 
     def fit(self, dataset):
         faiss.omp_set_num_threads(self.nt)
@@ -362,8 +362,12 @@ class FAISS(BaseFilterANN):
         return f"data/{name}.{self.indexkey}_cluster_wm.pickle"
 
 
-
-
+    def get_probes(self, freq, a, b, min_prob = 4, max_prob=256):
+        #print("b: ", b)
+        probes = int( pow(2, - a * log10(freq )+ b))
+        probes = max(min_prob, probes)
+        probes = min(max_prob, probes)
+        return probes
 
     def load_index(self, dataset):
         """
@@ -430,8 +434,8 @@ class FAISS(BaseFilterANN):
 
 
         # delete not necessary data
-        #del self.xb
-        #del ds
+        del self.xb
+        del ds
         if self.type == "exp" or self.type == 'direct':
             print(" deleting indices")
             del self.indices
@@ -465,19 +469,14 @@ class FAISS(BaseFilterANN):
         for i0 in range(0, nq, bs):
             _, self.I[i0:i0+bs] = self.index.search(X[i0:i0+bs], k)
 
-    
+
+
     def filtered_query(self, X, filter, k):
-        print('running filtered query')
 
         try:
-            print('k_factor was', self.index.k_factor)
             self.index.k_factor = self.k_factor
-            print('setting k_factor to ', self.k_factor)
         except Exception as e:
-            print(e)
             pass
-
-
 
         nq = X.shape[0]
         self.I = -np.ones((nq, k), dtype='int32')
@@ -487,81 +486,60 @@ class FAISS(BaseFilterANN):
         ndoc_per_word = self.ndoc_per_word
         freq_per_word = self.freq_per_word
 
-
         selector_by_thread = dict()
 
-        
+
         def process_one_row(q):
             faiss.omp_set_num_threads(1)
             thread = current_thread()
 
             qwords = csr_get_row_indices(meta_q, q)
-            assert qwords.size in (1, 2)
+            #assert qwords.size in (1, 2)
             w1 = qwords[0]
-            freq = freq_per_word[w1]
+            #freq = freq_per_word[w1]
             if qwords.size == 2:
                 w2 = qwords[1]
-                freq *= freq_per_word[w2]
+                #freq *= freq_per_word[w2]
             else:
                 w2 = -1
-            #if False:
-            if freq < self.metadata_threshold:
-                # metadata first
-                docs = csr_get_row_indices(docs_per_word, w1)
-                if w2 != -1:
-                    docs = bow_id_selector.intersect_sorted(
-                       docs, csr_get_row_indices(docs_per_word, w2))
-                    pass
-                assert len(docs) >= k#, pdb.set_trace()
-                xb_subset = self.xb[docs]
-                _, Ii = faiss.knn(X[q : q + 1], xb_subset, k=k)
- 
-                self.I[q, :] = docs[Ii.ravel()]
-            else:
 
-                if thread not in selector_by_thread:
+            if thread not in selector_by_thread:
 
-                    # IVF first, filtered search
-                    if self.type == 'simple':
-                        sel = make_id_selector_ivf_two(self.docs_per_word)
-                    elif self.type == "aware":
-                        sel = make_id_selector_cluster_aware(self.indices, self.limits, self.clusters, self.cluster_limits)
-                    elif self.type == 'intersect':
-                        sel = make_id_selector_cluster_aware_intersect(self.indices, self.limits, self.clusters, self.cluster_limits, self.max_range)
-                    elif self.type == 'direct':
-                        sel = make_id_selector_cluster_aware_direct(self.id_position_in_cluster, self.limits, self.clusters,
-                                                                       self.cluster_limits, self.max_range)
-                    elif self.type == 'exp':
-                        sel = make_id_selector_cluster_aware_direct_exp(self.id_position_in_cluster, self.limits, self.total_clusters, self.max_range)
-                    else:
-                        raise Exception('unknown type ', self.type)
-                    selector_by_thread[thread] = sel
+                # IVF first, filtered search
+                if self.type == 'simple':
+                    sel = make_id_selector_ivf_two(self.docs_per_word)
+                elif self.type == "aware":
+                    sel = make_id_selector_cluster_aware(self.indices, self.limits, self.clusters, self.cluster_limits)
+                elif self.type == 'intersect':
+                    sel = make_id_selector_cluster_aware_intersect(self.indices, self.limits, self.clusters, self.cluster_limits, self.max_range)
+                elif self.type == 'direct':
+                    sel = make_id_selector_cluster_aware_direct(self.id_position_in_cluster, self.limits, self.clusters,
+                                                                   self.cluster_limits, self.max_range)
+                elif self.type == 'exp':
+                    sel = make_id_selector_cluster_aware_direct_exp(self.id_position_in_cluster, self.limits, self.total_clusters, self.max_range)
                 else:
-                    sel = selector_by_thread.get(thread)
+                    raise Exception('unknown type ', self.type)
+                selector_by_thread[thread] = sel
+            else:
+                sel = selector_by_thread.get(thread)
 
-                sel.set_words(int(w1), int(w2))
-                params = faiss.SearchParametersIVF(sel=sel, nprobe=self.nprobe, max_codes=self.max_codes)
+            sel.set_words(int(w1), int(w2))
 
-                _, Ii = self.index.search( X[q:q+1], k, params=params)
-                Ii = Ii.ravel()
-                self.I[q] = Ii
-
+            params = faiss.SearchParametersIVF(sel=sel, nprobe=self.nprobe, max_codes=self.max_codes)
+            _, Ii = self.index.search( X[q:q+1], k, params=params)
+            Ii = Ii.ravel()
+            self.I[q] = Ii
 
         if self.nt <= 1:
-            #print_stats()
-        #if True:
             for q in range(nq):
                 process_one_row(q)
-                #print_stats()
-
         else:
-            print('threading')
+
             faiss.omp_set_num_threads(self.nt)
 
             pool = ThreadPool(self.nt)
             list(pool.map(process_one_row, range(nq)))
 
-        #print_stats()
 
     def get_results(self):
         return self.I
@@ -576,10 +554,11 @@ class FAISS(BaseFilterANN):
         else:
             self.nprobe = 1
         if "max_codes" in query_args:
-            self.max_codes = query_args['max_codes']
+            self.max_codes = query_args["max_codes"]
             self.ps.set_index_parameters(self.index, f"max_codes={query_args['max_codes']}")
+            self.qas = query_args
         else:
-            self.max_codes = 0
+            self.max_codes = -1
         if "k_factor" in query_args:
             self.k_factor = query_args['k_factor']
             self.qas = query_args
