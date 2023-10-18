@@ -1,0 +1,37 @@
+algorithm,parameters,dataset,count,qps,distcomps,build,indexsize,queriessize,mean_ssd_ios,mean_latency,track,recall/ap
+faiss,"Faiss(('IVF1024,SQ8', {'nprobe': 1}))",random-filter-s,10,18082.715745998077,0.0,1000000.0,46120.0,2.5505018520355223,0,0,filter,0.9147000000000001
+faiss,"Faiss(('IVF1024,SQ8', {'nprobe': 2}))",random-filter-s,10,14567.50092038816,0.0,1000000.0,46120.0,3.1659514045715333,0,0,filter,0.9701000000000001
+faiss,"Faiss(('IVF1024,SQ8', {'nprobe': 4}))",random-filter-s,10,11207.165225569937,0.0,1000000.0,46120.0,4.115224418640136,0,0,filter,0.9759
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 1, 'mt_threshold': 0.0001}))",yfcc-10M,10,5481.544745224334,0.0,1000000.0,2931980.0,534.882069977522,0,0,filter,0.482366
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 1, 'mt_threshold': 0.0003}))",yfcc-10M,10,5805.768164906304,0.0,1000000.0,2931980.0,505.01155346207617,0,0,filter,0.5379240000000001
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 4, 'mt_threshold': 0.0001}))",yfcc-10M,10,5530.588908723929,0.0,1000000.0,2931980.0,530.1388420634747,0,0,filter,0.6253599999999999
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 4, 'mt_threshold': 0.0003}))",yfcc-10M,10,5572.696266991938,0.0,1000000.0,2931980.0,526.1331067631721,0,0,filter,0.673125
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 16, 'mt_threshold': 0.0001}))",yfcc-10M,10,5442.350584567816,0.0,1000000.0,2931980.0,538.7341286527634,0,0,filter,0.78061
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 1, 'mt_threshold': 0.01}))",yfcc-10M,10,1802.756074136301,0.0,1000000.0,2931980.0,1626.387530772686,0,0,filter,0.7835880000000001
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 16, 'mt_threshold': 0.0003}))",yfcc-10M,10,5581.10471251144,0.0,1000000.0,2931980.0,525.340439040184,0,0,filter,0.8174239999999999
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 32, 'mt_threshold': 0.0001}))",yfcc-10M,10,5730.400247780178,0.0,1000000.0,2931980.0,511.6536146206855,0,0,filter,0.847014
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 4, 'mt_threshold': 0.01}))",yfcc-10M,10,1804.2096973079465,0.0,1000000.0,2931980.0,1625.0771761036397,0,0,filter,0.862773
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 32, 'mt_threshold': 0.0003}))",yfcc-10M,10,5389.5705696086925,0.0,1000000.0,2931980.0,544.0099470138073,0,0,filter,0.877257
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 64, 'mt_threshold': 0.0001}))",yfcc-10M,10,5606.378596595774,0.0,1000000.0,2931980.0,522.972173477602,0,0,filter,0.901073
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 64, 'mt_threshold': 0.0003}))",yfcc-10M,10,4866.073979892946,0.0,1000000.0,2931980.0,602.5350235354424,0,0,filter,0.9240959999999999
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 96, 'mt_threshold': 0.0001}))",yfcc-10M,10,4769.7147024646665,0.0,1000000.0,2931980.0,614.7076256961345,0,0,filter,0.926014
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 16, 'mt_threshold': 0.01}))",yfcc-10M,10,1663.8239712015722,0.0,1000000.0,2931980.0,1762.1936279007912,0,0,filter,0.9367110000000001
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 96, 'mt_threshold': 0.0003}))",yfcc-10M,10,3975.1812751256325,0.0,1000000.0,2931980.0,737.5713953843116,0,0,filter,0.9448719999999999
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 32, 'mt_threshold': 0.01}))",yfcc-10M,10,1696.757302997393,0.0,1000000.0,2931980.0,1727.9902050932883,0,0,filter,0.9623430000000001
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 64, 'mt_threshold': 0.01}))",yfcc-10M,10,1695.99454370896,0.0,1000000.0,2931980.0,1728.7673541614533,0,0,filter,0.979552
+faiss,"Faiss(('IVF16384,SQ8', {'nprobe': 96, 'mt_threshold': 0.01}))",yfcc-10M,10,1692.9806649788245,0.0,1000000.0,2931980.0,1731.8449410860062,0,0,filter,0.9861280000000001
+wm_filter,"Faiss(('IVF16384,SQ8', 'intersect', {'nprobe': 64, 'mt_threshold': 0.0, 'max_codes': 1000}))",yfcc-10M,10,7664.917599793,0.0,1000000.0,6669804.0,870.1729553074551,0,0,filter,0.723871
+wm_filter,"Faiss(('IVF16384,SQ8', 'intersect', {'nprobe': 256, 'mt_threshold': 0.0, 'max_codes': 500}))",yfcc-10M,10,5422.9276372844115,0.0,1000000.0,6669804.0,1229.9267934432507,0,0,filter,0.803496
+wm_filter,"Faiss(('IVF16384,SQ8', 'intersect', {'nprobe': 256, 'mt_threshold': 0.0, 'max_codes': 1000}))",yfcc-10M,10,5093.466038825695,0.0,1000000.0,6669804.0,1309.4823739195347,0,0,filter,0.840371
+wm_filter,"Faiss(('IVF16384,SQ8', 'intersect', {'nprobe': 512, 'mt_threshold': 0.0, 'max_codes': 500}))",yfcc-10M,10,4168.213484515027,0.0,1000000.0,6669804.0,1600.158922948265,0,0,filter,0.8431390000000001
+wm_filter,"Faiss(('IVF16384,SQ8', 'intersect', {'nprobe': 256, 'mt_threshold': 0.0, 'max_codes': 2000}))",yfcc-10M,10,4669.421462761591,0.0,1000000.0,6669804.0,1428.400510254078,0,0,filter,0.862008
+wm_filter,"Faiss(('IVF16384,SQ8', 'intersect', {'nprobe': 1024, 'mt_threshold': 0.0, 'max_codes': 500}))",yfcc-10M,10,2904.130273358903,0.0,1000000.0,6669804.0,2296.6614346420956,0,0,filter,0.872842
+wm_filter,"Faiss(('IVF16384,SQ8', 'intersect', {'nprobe': 512, 'mt_threshold': 0.0, 'max_codes': 1000}))",yfcc-10M,10,3701.91495695428,0.0,1000000.0,6669804.0,1801.7172402813721,0,0,filter,0.8818059999999999
+wm_filter,"Faiss(('IVF16384,SQ8', 'intersect', {'nprobe': 2048, 'mt_threshold': 0.0, 'max_codes': 500}))",yfcc-10M,10,1910.6732869506748,0.0,1000000.0,6669804.0,3490.813445476398,0,0,filter,0.892923
+wm_filter,"Faiss(('IVF16384,SQ8', 'intersect', {'nprobe': 4096, 'mt_threshold': 0.0, 'max_codes': 500}))",yfcc-10M,10,1192.5736513825443,0.0,1000000.0,6669804.0,5592.781621720161,0,0,filter,0.903354
+wm_filter,"Faiss(('IVF16384,SQ8', 'intersect', {'nprobe': 512, 'mt_threshold': 0.0, 'max_codes': 2000}))",yfcc-10M,10,3264.9846582142386,0.0,1000000.0,6669804.0,2042.828588250704,0,0,filter,0.904801
+wm_filter,"Faiss(('IVF16384,SQ8', 'intersect', {'nprobe': 1024, 'mt_threshold': 0.0, 'max_codes': 1000}))",yfcc-10M,10,2582.533709997165,0.0,1000000.0,6669804.0,2582.6590275204276,0,0,filter,0.912494
+wm_filter,"Faiss(('IVF16384,SQ8', 'intersect', {'nprobe': 2048, 'mt_threshold': 0.0, 'max_codes': 1000}))",yfcc-10M,10,1613.292933364819,0.0,1000000.0,6669804.0,4134.279560804185,0,0,filter,0.933062
+wm_filter,"Faiss(('IVF16384,SQ8', 'intersect', {'nprobe': 1024, 'mt_threshold': 0.0, 'max_codes': 2000}))",yfcc-10M,10,2262.301466218388,0.0,1000000.0,6669804.0,2948.2383756525132,0,0,filter,0.936234
+wm_filter,"Faiss(('IVF16384,SQ8', 'intersect', {'nprobe': 2048, 'mt_threshold': 0.0, 'max_codes': 2000}))",yfcc-10M,10,1410.2498792086137,0.0,1000000.0,6669804.0,4729.519284726248,0,0,filter,0.9571059999999999
+wm_filter,"Faiss(('IVF16384,SQ8', 'intersect', {'nprobe': 4096, 'mt_threshold': 0.0, 'max_codes': 2000}))",yfcc-10M,10,917.4838962075518,0.0,1000000.0,6669804.0,7269.668740312329,0,0,filter,0.9678509999999999
