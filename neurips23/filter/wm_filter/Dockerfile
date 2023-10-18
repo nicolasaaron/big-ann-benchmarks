@@ -22,7 +22,7 @@ RUN cd /build/CMake-3.27.1 &&   ./bootstrap && make   && make install
 
 
 # we get the modified Faiss code
-RUN git clone https://github.com/alemagnani/faiss.git
+RUN cd /
 RUN cd / &&  git clone https://github.com/alemagnani/faiss.git && cd /faiss && git pull && git checkout wm_filter
 
 RUN apt install -y cmake

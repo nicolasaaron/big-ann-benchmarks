@@ -406,7 +406,38 @@ yfcc-10M:
               "type": "direct"
             }]
           query-args: |
-            [  
+            [
+            {"nprobe": 128, "mt_threshold":0.0, "max_codes": 1800, "k_factor": 2, "selector_probe_limit": 128},
+            {"nprobe": 108, "mt_threshold":0.0, "max_codes": 1800, "k_factor": 2, "selector_probe_limit": 108},
+             {"nprobe": 118, "mt_threshold":0.0, "max_codes": 1800, "k_factor": 2, "selector_probe_limit": 118},
+            {"nprobe": 128, "mt_threshold":0.0, "max_codes": 1800, "k_factor": 3, "selector_probe_limit": 128},
+            {"nprobe": 118, "mt_threshold":0.0, "max_codes": 1800, "k_factor": 3, "selector_probe_limit": 118},
+            {"nprobe": 98, "mt_threshold":0.0, "max_codes": 1800, "k_factor": 3, "selector_probe_limit": 98},
+             {"nprobe": 98, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 0},
+             {"nprobe": 128, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 128},
+             {"nprobe": 256, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 128},
+             {"nprobe": 256, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 256},
+             {"nprobe": 512, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 256},
+                  {"nprobe": 118, "mt_threshold":0.0, "max_codes": 6000, "k_factor": 3, "selector_probe_limit": 118},
+            {"nprobe": 108, "mt_threshold":0.0, "max_codes": 6000, "k_factor": 3, "selector_probe_limit": 108},
+            {"nprobe": 98, "mt_threshold":0.0, "max_codes": 6000, "k_factor": 3, "selector_probe_limit": 98},
+            {"nprobe": 32, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 32},
+            {"nprobe": 64, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 64},
+              {"nprobe": 118, "mt_threshold":0.0, "max_codes": 1000, "k_factor": 3, "selector_probe_limit": 118},
+            {"nprobe": 108, "mt_threshold":0.0, "max_codes": 1000, "k_factor": 3, "selector_probe_limit": 108},
+            {"nprobe": 98, "mt_threshold":0.0, "max_codes": 1000, "k_factor": 3, "selector_probe_limit": 98},
+                {"nprobe": 118, "mt_threshold":0.0, "max_codes": 3000, "k_factor": 3, "selector_probe_limit": 118},
+            {"nprobe": 108, "mt_threshold":0.0, "max_codes": 3000, "k_factor": 3, "selector_probe_limit": 108},
+            {"nprobe": 98, "mt_threshold":0.0, "max_codes": 3000, "k_factor": 3, "selector_probe_limit": 98},
+                     {"nprobe": 118, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 118},
+            {"nprobe": 108, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 108},
+            {"nprobe": 98, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 98},
+            {"nprobe": 118, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 5, "selector_probe_limit": 118},
+            {"nprobe": 108, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 5, "selector_probe_limit": 108},
+            {"nprobe": 98, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 5, "selector_probe_limit": 98},
+              {"nprobe": 118, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 118},
+            {"nprobe": 108, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 108},
+            {"nprobe": 98, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 98},
               {"nprobe": 98, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 5},
               {"nprobe": 108, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 5},
               {"nprobe": 128, "mt_threshold":0.0, "max_codes": 2000, "k_factor": 5},
@@ -571,4 +602,23 @@ yfcc-10M:
             {"nprobe": 1, "mt_threshold":0.0001, "max_codes": 2000},
             {"nprobe": 0.5, "mt_threshold":0.0001, "max_codes": 2000}
             ]
-   
+    wm_filter_direct_512_pq_refine:
+      docker-tag: neurips23-filter-wm_filter
+      module: neurips23.filter.wm_filter.wm_filter
+      constructor: FAISS
+      base-args: [ "@metric" ]
+      run-groups:
+        base:
+          args: |
+            [{"indexkey": "IVF512,PQ96,Refine(SQ8)", 
+              "threads": 8,
+              "train_size": 2000000,
+              "type": "direct"
+            }]
+          query-args: |
+            [
+             {"nprobe": 64,  "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 64},
+            {"nprobe": 256,  "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 256},
+            {"nprobe": 128,  "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 128},
+            {"nprobe": 512,  "max_codes": 2000, "k_factor": 3, "selector_probe_limit": 512}
+            ]

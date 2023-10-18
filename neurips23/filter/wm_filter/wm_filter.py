@@ -290,6 +290,8 @@ class FAISS(BaseFilterANN):
         self.nt = index_params.get("threads", 1)
         self.type = index_params.get("type", "intersect")
 
+        self.clustet_dist = []
+
 
     def fit(self, dataset):
         faiss.omp_set_num_threads(self.nt)
@@ -496,12 +498,21 @@ class FAISS(BaseFilterANN):
             qwords = csr_get_row_indices(meta_q, q)
             #assert qwords.size in (1, 2)
             w1 = qwords[0]
+            #num_clusters = self.cluster_limits[w1+1] - self.cluster_limits[w1]
+            #wd = self.ndoc_per_word[w1]
             #freq = freq_per_word[w1]
             if qwords.size == 2:
                 w2 = qwords[1]
                 #freq *= freq_per_word[w2]
+                #num_clusters = min( num_clusters, self.cluster_limits[w2 + 1] - self.cluster_limits[w2])
+                #wd = min(wd, self.ndoc_per_word[w1])
             else:
                 w2 = -1
+
+            #if wd < 2000:
+            #    print("num probes: ", num_clusters, 'num docs: ', wd)
+
+            #self.clustet_dist.append(num_clusters)
 
             if thread not in selector_by_thread:
 
@@ -525,7 +536,7 @@ class FAISS(BaseFilterANN):
 
             sel.set_words(int(w1), int(w2))
 
-            params = faiss.SearchParametersIVF(sel=sel, nprobe=self.nprobe, max_codes=self.max_codes)
+            params = faiss.SearchParametersIVF(sel=sel, nprobe=self.nprobe, max_codes=self.max_codes, selector_probe_limit=self.selector_probe_limit)
             _, Ii = self.index.search( X[q:q+1], k, params=params)
             Ii = Ii.ravel()
             self.I[q] = Ii
@@ -539,6 +550,15 @@ class FAISS(BaseFilterANN):
 
             pool = ThreadPool(self.nt)
             list(pool.map(process_one_row, range(nq)))
+
+        # distances = [20, 40, 80, 100, 200, 400]
+        # for d in distances:
+        #     count = 0
+        #     for c in self.clustet_dist:
+        #         if c <= d:
+        #             count+= 1
+        #     print('distance: ', d, " selected: ", count, (count+0.0)/1000)
+        # self.clustet_dist = []
 
 
     def get_results(self):
@@ -559,14 +579,18 @@ class FAISS(BaseFilterANN):
             self.qas = query_args
         else:
             self.max_codes = -1
+        if "selector_probe_limit" in query_args:
+            self.selector_probe_limit = query_args['selector_probe_limit']
+            self.ps.set_index_parameters(self.index, f"selector_probe_limit={query_args['selector_probe_limit']}")
+            self.qas = query_args
+        else:
+            self.selector_probe_limit = 0
+
         if "k_factor" in query_args:
             self.k_factor = query_args['k_factor']
             self.qas = query_args
 
-        if "mt_threshold" in query_args:
-            self.metadata_threshold = query_args['mt_threshold']
-        else:
-            self.metadata_threshold = 1e-3
+
 
     def __str__(self):
         return f'Faiss({self.indexkey,self.type, self.qas})'
